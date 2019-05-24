@@ -1,1 +1,0 @@
-initSidebarItems({"macro":[["arraycollect","Tries to collect `$iter` into an array of type `[$tgt; $size]`. If the iterator yields less than `$size` elements, and error is returned."],["uninit_array",""]],"struct":[["FillError",""]]});

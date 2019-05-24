@@ -1,1 +1,0 @@
-C:\Users\Kasper\Documents\Rust\arraycollect\target\debug\examples\rangecollect.exe: C:\Users\Kasper\Documents\Rust\arraycollect\examples\rangecollect.rs C:\Users\Kasper\Documents\Rust\arraycollect\src\lib.rs

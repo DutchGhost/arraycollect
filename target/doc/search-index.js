@@ -1,5 +1,0 @@
-var N=null,E="",T="t",U="u",searchIndex={};
-var R=["arraycollect","result","fillerror","ordering","formatter","FillError"];
-
-searchIndex["arraycollect"]={"doc":E,"i":[[3,R[5],R[0],E,N,N],[11,"new",E,E,0,[[["usize"]],["self"]]],[14,"uninit_array",E,E,N,N],[14,R[0],E,"Tries to collect `$iter` into an array of type `[$tgt;…",N,N],[11,"from",E,E,0,[[[T]],[T]]],[11,"try_from",E,E,0,[[[U]],[R[1]]]],[11,"into",E,E,0,[[],[U]]],[11,"try_into",E,E,0,[[],[R[1]]]],[11,"borrow",E,E,0,[[["self"]],[T]]],[11,"borrow_mut",E,E,0,[[["self"]],[T]]],[11,"type_id",E,E,0,[[["self"]],["typeid"]]],[11,"eq",E,E,0,[[["self"],[R[2]]],["bool"]]],[11,"ne",E,E,0,[[["self"],[R[2]]],["bool"]]],[11,"cmp",E,E,0,[[["self"],[R[2]]],[R[3]]]],[11,"partial_cmp",E,E,0,[[["self"],[R[2]]],[["option",[R[3]]],[R[3]]]]],[11,"lt",E,E,0,[[["self"],[R[2]]],["bool"]]],[11,"le",E,E,0,[[["self"],[R[2]]],["bool"]]],[11,"gt",E,E,0,[[["self"],[R[2]]],["bool"]]],[11,"ge",E,E,0,[[["self"],[R[2]]],["bool"]]],[11,"fmt",E,E,0,[[["self"],[R[4]]],[R[1]]]],[11,"fmt",E,E,0,[[["self"],[R[4]]],[R[1]]]],[11,"clone",E,E,0,[[["self"]],[R[2]]]]],"p":[[3,R[5]]]};
-initSearch(searchIndex);addSearchOptions(searchIndex);
