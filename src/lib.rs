@@ -5,10 +5,10 @@
 //! creates a PartialArray struct declaration under the hood,
 //! which internally makes use of the MaybeUninit type,
 //! to safely construct an uninitialized array.
-//! 
+//!
 //! After the array is constructed, the array is filled
 //! with elements yielded from the iterator.
-//! 
+//!
 //! Once the filling phase is complete,
 //! a check is performed to determine whether
 //! the array was completely filled or not.
@@ -58,21 +58,21 @@ impl std::error::Error for FillError {}
 
 /// Tries to collect `$iter` into an array of type `[$tgt; $size]`.
 /// If the iterator yields less than `$size` elements, and error is returned.
-/// 
+///
 /// # Examples
 /// ```
 /// use arraycollect::arraycollect;
-/// 
+///
 /// let array = arraycollect!(0..10 => [usize; 10]);
-/// 
+///
 /// assert_eq!(array, Ok([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]));
 /// ```
-/// 
+///
 /// We try to collect an iterator of 5 elements into an array of 20.
 /// This results in an error.
 /// ```
 /// use arraycollect::{FillError, arraycollect};
-/// 
+///
 /// let array = arraycollect!(0..5 => [usize; 20]);
 /// // filled 5 elements of an array of 20.
 /// assert_eq!(array, Err(FillError::new(5, 20)));
@@ -86,9 +86,37 @@ macro_rules! arraycollect {
             type Array<T> = [T; $size];
             type UninitArray<T> = [MaybeUninit<T>; $size];
 
+            /// This is a PartialArray, which allows some elements
+            /// to be initialized, and some elements to not be initialized.
+            ///
+            /// This allows collecting an iterator into an array,
+            /// because we can safely make an uninitialized array,
+            /// and then fill it with elements of the iterator as we go.
+            #[repr(C)]
             struct PartialArray<T> {
                 data: UninitArray<T>,
                 filled: usize,
+            }
+
+            /// This is a FilledArray, which is used to
+            /// move the fully initialized array out of a PartialArray.
+            ///
+            /// We have to do it this way, because PartialArray
+            /// implements Drop, so we cant move out of it.
+            ///
+            /// We transmute a PartialArray to this struct,
+            /// and then move out of this struct instead.
+            #[repr(C)]
+            struct FilledArray<T> {
+                data: Array<T>,
+                _filled: usize,
+            }
+
+            impl <T> FilledArray<T> {
+                #[inline(always)]
+                fn data(self) -> Array<T> {
+                    self.data
+                }
             }
 
             impl <T> PartialArray<T> {
@@ -100,7 +128,7 @@ macro_rules! arraycollect {
                 }
 
                 #[inline]
-                fn is_filled(&self) -> bool {
+                const fn is_filled(&self) -> bool {
                     self.filled == $size
                 }
 
@@ -137,48 +165,52 @@ macro_rules! arraycollect {
                         Err($crate::FillError::new(filled, $size))
                     }
                 }
-
-                fn into_inner(mut self) -> [T; $size] {
-                    /*
-                        This function sets the length first to 0,
-                        Whenever somehow drop is still called,
-                        it won't do anything, because the length is 0.
-
-                        After, it reads the array from self, moving out of self.
-                        This has to be done with a ptr::read, because of the Drop impl.
-                        When we've read the array, we mem::forget(self), so it's never dropped.
-                    */
-                    self.filled = 0;
-                    unsafe {
-                        let ptr = &mut self.data as *mut UninitArray<T> as *mut Array<T>;
-                        let rd = ::core::ptr::read(ptr);
-                        mem::forget(self);
-                        rd
-                    }
-                }
             }
 
             impl <T> Drop for PartialArray<T> {
                 fn drop(&mut self) {
-                    /*
-                        For every initialized element in the array:
-                            - replace with MaybeUninit::uninit(),
-                            - assume_init the element
-                            - drop(element)
-                    */
-                    self.data[0..self.filled].iter_mut().map(|elem| {
-                        let elem = mem::replace(elem, MaybeUninit::uninit());
-                        unsafe {
-                            elem.assume_init()
-                        }
-                    }).for_each(drop)
+                    //for elem in &mut self.data[..self.filled] {
+                    //    unsafe {
+                    //        ::core::ptr::drop_in_place(elem.as_mut_ptr());
+                    //    }
+                    //}
+
+                    let len = self.filled;
+
+                    let ptr: *mut MaybeUninit<T> = self.data[..len].as_mut_ptr();
+                    let ptr = ptr as *mut T;
+
+                    unsafe {
+                        let slice = ::core::slice::from_raw_parts_mut(ptr, len);
+                        ::core::ptr::drop_in_place::<[T]>(slice);
+                    }
+                }
+            }
+
+            impl PartialArray<$tgt> {
+                /// This function sets the length to 0,
+                /// to avoid drop doing any work if it's somehow invoked.
+                /// Then it simply transmute's self, hence its marked unsafe.
+                ///
+                /// Transmuting a PartialArray<$tgt> to a FilledArray<$tgt>
+                /// is actually safe, because they both have the same layout,
+                /// enforced by #[repr(C)].
+                #[inline(always)]
+                unsafe fn into_filled(mut self) -> FilledArray<$tgt> {
+                    self.filled = 0;
+                    mem::transmute(self)
+                }
+
+                /// Transforms the partial array into a fully initialized array.
+                fn into_array(mut self) -> Array<$tgt> {
+                    unsafe { self.into_filled().data() }
                 }
             }
 
             PartialArray::<$tgt>::new()
                 .collect($iter)
                 .map(|partial_array| {
-                    partial_array.into_inner()
+                    partial_array.into_array()
                 })
         }
     );
