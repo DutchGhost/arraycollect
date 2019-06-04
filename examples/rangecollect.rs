@@ -1,9 +1,10 @@
 #[macro_use]
 extern crate arraycollect;
+use arraycollect::IntoArray;
 
 fn main() {
-    let array = arraycollect!((0..10).map(Box::new) => [Box<usize>; 10]);
-
+    //let array = arraycollect!((0..10).map(Box::new) => [Box<usize>; 10]);
+    let array = (0..10).map(Box::new).array_collect::<[_; 10]>();
     assert_eq!(
         array,
         Ok([

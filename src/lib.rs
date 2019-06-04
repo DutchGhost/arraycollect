@@ -1,3 +1,4 @@
+#![feature(const_generics)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 //! This crate provides a macro that collects an iterator into an array.
@@ -15,6 +16,9 @@
 //! If it's not completely filled, the already written elements
 //! get dropped, and an error is returned.
 //! If it's completely filled, the array is returned.
+
+mod array;
+pub use array::IntoArray;
 
 #[macro_export]
 macro_rules! uninit_array {
