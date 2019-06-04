@@ -3,35 +3,11 @@ use crate::FillError;
 use core::mem::{self, MaybeUninit};
 use core::ptr;
 
-pub trait Array {
-    /// The array's element type.
-    type Item;
-
-    /// The uninit array.
-    type PartialArray: PartialArray<Element = <Self as Array>::Item>;
-
-    fn as_mut_slice(&mut self) -> &mut [Self::Item];
-}
-
-pub trait PartialArray: Array<Item = MaybeUninit<<Self as PartialArray>::Element>> {
-    type Element;
-
+pub trait PartialArray {
     fn uninit() -> Self;
 }
 
-impl<T, const N: usize> Array for [T; N] {
-    type Item = T;
-
-    type PartialArray = [MaybeUninit<T>; N];
-
-    fn as_mut_slice(&mut self) -> &mut [Self::Item] {
-        self
-    }
-}
-
 impl<T, const N: usize> PartialArray for [MaybeUninit<T>; N] {
-    type Element = T;
-
     fn uninit() -> Self {
         unsafe { MaybeUninit::<_>::uninit().assume_init() }
     }
@@ -62,14 +38,14 @@ where
 impl<T, const N: usize> FromIter<T> for [T; N] {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Result<Self, FillError> {
         // First create an uninitialized array of [MaybeUninit<T>; N].
-        let mut partial = <[T; N] as Array>::PartialArray::uninit();
+        let mut partial = <[MaybeUninit<T>; N]>::uninit();
 
         // Then setup a scopeguard,
         // which should drop any already written items
         // if there is a panic during collecting,
         // or if the iterator has less elements than `N`.
         let mut guard = ScopeExitGuard {
-            value: partial.as_mut_slice(),
+            value: &mut partial[..],
             data: 0,
 
             f: move |&len, slice| {
@@ -83,7 +59,7 @@ impl<T, const N: usize> FromIter<T> for [T; N] {
         // Collect
         for (src, dst) in iter.into_iter().zip(guard.value.iter_mut()) {
             unsafe {
-                ptr::write(dst, MaybeUninit::new(src));
+                ptr::write(dst.as_mut_ptr(), src);
                 guard.data += 1;
             }
         }
@@ -97,13 +73,16 @@ impl<T, const N: usize> FromIter<T> for [T; N] {
 
             mem::forget(guard);
 
-            let array: [T; N] = unsafe {
-                let ptr: *const [MaybeUninit<T>; N] = &partial;
-                let ptr: *const [T; N] = ptr as _;
-                ptr::read(ptr)
-            };
-
-            Ok(array)
+            // transmute_copy could be just a transmute,
+            // but due to to the fact that the layout might differ,
+            // we cant.
+            // A case where the layout differs is Option<MaybeUninit<T>> -> Option<T>.
+            // In our case, a [MaybeUninit<T>; N] doesnt differ from the layout of [T; N]/
+            unsafe {
+                let array: [T; N] = mem::transmute_copy(&partial);
+                mem::forget(partial);
+                Ok(array)
+            }
         } else {
             // We're not good, so return an error.
             // The dropguard will run here.
